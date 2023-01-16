@@ -136,13 +136,13 @@ app.get("/messages", async (req, res) => {
   console.log(limit);
   console.log(user);
   try {
-    const existente = await db.collection("participants").findOne({
-      name: user,
-    });
+    // const existente = await db.collection("participants").findOne({
+    //   name: user,
+    // });
 
-    if (!existente) {
-      return res.status(422).send("Remetente não logado");
-    }
+    // if (!existente) {
+    //   return res.status(422).send("Remetente não logado");
+    // }
 
     const messages = await db
       .collection("messages")
@@ -158,17 +158,76 @@ app.get("/messages", async (req, res) => {
 
     console.log(messages);
 
-    if (limit < 0 || limit === 0) {
-      return res.sendStatus(422);
-    } else if (limit > 0) {
-      return res.send(messages.slice(-limit).reverse());
-    } else {
-      res.send(messages.reverse());
+    if (limit) {
+      if (limit < 0 || limit === 0 || isNaN(limit)) {
+        return res.sendStatus(422);
+      } else if (limit > 0) {
+        return res.send(messages.slice(-limit).reverse());
+      }
     }
+
+    res.send(messages.reverse());
   } catch (erro) {
     return res.status(500).send(erro.message);
   }
 });
+
+app.post("/status", async (req, res) => {
+  const user = req.headers.user;
+  try {
+    const existente = await db.collection("participants").findOne({
+      name: user,
+    });
+
+    if (!existente) {
+      return res.sendStatus(404);
+    }
+
+    await db.collection("participants").updateOne(
+      {
+        name: user,
+      },
+      {
+        $set: {
+          lastStatus: Date.now(),
+        },
+      }
+    );
+
+    res.sendStatus(200);
+  } catch (erro) {
+    return res.status(500).send(erro.message);
+  }
+});
+
+setInterval(async () => {
+  try {
+    const Inativos = await db
+      .collection("participants")
+      .find({
+        lastStatus: { $lt: Date.now() - 10000 },
+      })
+      .toArray();
+
+    Inativos.map(async (user) => {
+      await db.collection("participants").deleteOne({
+        name: user.name,
+      });
+
+      const mensagem = {
+        from: user.name,
+        to: "Todos",
+        text: "sai de sala...",
+        type: "status",
+        time: dayjs().format("HH:mm:ss"),
+      };
+
+      await db.collection("messages").insertOne(mensagem);
+    });
+  } catch (erro) {
+    res.status(500).send(erro.message);
+  }
+}, 15000);
 
 // Port
 
