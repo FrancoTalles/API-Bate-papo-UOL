@@ -1,27 +1,83 @@
+// Importações
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient } from "mongodb";
+import joi from "joi";
+
+// Iniciando configurações
 
 dotenv.config();
-
-const mongoClient = new MongoClient(process.env.DATABASE_URL);
-let db;
-
-try {
-    await mongoClient.connect();
-    console.log("MongoDB Connected!");
-    db = mongoClient.db();
-} catch (err){
-    console.log(err.message);
-}
-
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// MongoClient
+
+const mongoClient = new MongoClient(process.env.DATABASE_URL);
+let db;
+
+//Conectando ao Mongo
+
+try {
+    await mongoClient.connect();
+    console.log("MongoDB Connected!");
+} catch (err){
+    console.log(err.message);
+}
+
+db = mongoClient.db();
+
+// Rotas
+
+app.post("/participants", async(req, res) => {
+    try{
+
+        const participante = req.body;
+
+        const participanteSchema = joi.object({
+            name: joi.string().required()
+        });
+
+        const validation = participanteSchema.validate(participante, {abortEarly: false});
+
+        if (validation.error){
+            const errors = validation.error.details.map((detail) => detail.message);
+            return res.status(422).send(errors);
+        }
+
+        const resp = await db.collection("participants").findOne({name: participante.name});
+
+        if (resp){
+            return res.status(409).send("Nome já em uso");
+        }
+
+        await db.collection("participants").insertOne({
+            name: participante.name, lastStatus: Date.now()
+        });
+
+        await db.collection("messages").insertOne({
+            from: participante.name, to: "Todos", text: "entra na sala...", type: "status", time: dayjs().format("HH:mm:ss"),
+        })
+
+        return res.sendStatus(201);
 
 
+
+    } catch(erro){
+        return res.status(500).send(erro.message)
+    }
+})
+
+
+
+
+
+
+
+
+
+// Port
 
 const PORT = 5000;
 
