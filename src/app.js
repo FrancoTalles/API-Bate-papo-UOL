@@ -69,7 +69,7 @@ app.post("/participants", async (req, res) => {
       time: dayjs().format("HH:mm:ss"),
     };
 
-    await db.collection("messages").insertOne({ message });
+    await db.collection("messages").insertOne(message);
 
     return res.sendStatus(201);
   } catch (erro) {
@@ -95,7 +95,7 @@ app.post("/messages", async (req, res) => {
     const messageSchema = joi.object({
       to: joi.string().required(),
       text: joi.string().required(),
-      type: joi.string().valid("message", "private-message").required(),
+      type: joi.string().valid("message", "private_message").required(),
     });
 
     const validation = messageSchema.validate(message, { abortEarly: false });
@@ -121,12 +121,52 @@ app.post("/messages", async (req, res) => {
       time: dayjs().format("HH:mm:ss"),
     };
 
-    await db.collection("messages").insertOne({ messagem });
+    await db.collection("messages").insertOne(messagem);
 
     return res.sendStatus(201);
-
   } catch (erro) {
     res.status(500).send(erro.message);
+  }
+});
+
+// Messages GET com query string
+app.get("/messages", async (req, res) => {
+  const limit = Number(req.query.limit);
+  const user = req.headers.user;
+  console.log(limit);
+  console.log(user);
+  try {
+    const existente = await db.collection("participants").findOne({
+      name: user,
+    });
+
+    if (!existente) {
+      return res.status(422).send("Remetente não logado");
+    }
+
+    const messages = await db
+      .collection("messages")
+      .find({
+        $or: [
+          { to: user, type: "private_message" },
+          { from: user, type: "private_message" },
+          { type: "message" },
+          { type: "status" },
+        ],
+      })
+      .toArray();
+
+    console.log(messages);
+
+    if (limit < 0 || limit === 0) {
+      return res.sendStatus(422);
+    } else if (limit > 0) {
+      return res.send(messages.slice(-limit).reverse());
+    } else {
+      res.send(messages.reverse());
+    }
+  } catch (erro) {
+    return res.status(500).send(erro.message);
   }
 });
 
