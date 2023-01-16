@@ -131,7 +131,7 @@ app.post("/messages", async (req, res) => {
 
 // Messages GET com query string
 app.get("/messages", async (req, res) => {
-  const limit = Number(req.query.limit);
+  let limit = req.query.limit;
   const user = req.headers.user;
   console.log(limit);
   console.log(user);
@@ -156,9 +156,10 @@ app.get("/messages", async (req, res) => {
       })
       .toArray();
 
-    console.log(messages);
-
     if (limit) {
+      console.log("Tem limite");
+      limit = parseInt(limit);
+      console.log(typeof(limit));
       if (limit < 0 || limit === 0 || isNaN(limit)) {
         return res.sendStatus(422);
       } else if (limit > 0) {
@@ -202,14 +203,14 @@ app.post("/status", async (req, res) => {
 
 setInterval(async () => {
   try {
-    const Inativos = await db
+    const inativos = await db
       .collection("participants")
       .find({
         lastStatus: { $lt: Date.now() - 10000 },
       })
       .toArray();
 
-    Inativos.map(async (user) => {
+    inativos.map(async (user) => {
       await db.collection("participants").deleteOne({
         name: user.name,
       });
@@ -217,7 +218,7 @@ setInterval(async () => {
       const mensagem = {
         from: user.name,
         to: "Todos",
-        text: "sai de sala...",
+        text: "sai da sala...",
         type: "status",
         time: dayjs().format("HH:mm:ss"),
       };
